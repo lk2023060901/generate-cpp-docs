@@ -93,4 +93,6 @@ namespace utils
     std::string generateTempFilename();
 
     void removeFile(const fs::path& path);
+
+    std::string generateCodeComments(const std::string& funcDecl);
 }

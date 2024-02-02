@@ -1,5 +1,13 @@
 #include "Utils.h"
 
+#include <sstream>
+
+#include <curlpp/cURLpp.hpp>
+#include <curlpp/Easy.hpp>
+#include <curlpp/Options.hpp>
+
+#include <nlohmann/json.hpp>
+
 namespace utils
 {
 	void findFilesWithExtensions(std::vector<fs::path>& foundFiles, const std::vector<std::string>& directories
@@ -65,5 +73,67 @@ namespace utils
     void removeFile(const fs::path& path)
     {
         std::filesystem::remove(path);
+    }
+
+    std::string generateCodeComments(const std::string& funcDecl)
+    {
+        try {
+            // 初始化 curlpp
+            curlpp::Cleanup cleaner;
+            curlpp::Easy request;
+
+            // 设置请求 URL
+            request.setOpt<curlpp::options::Url>("http://47.253.97.14:8380/chat/completions");
+
+            // 设置 HTTP 头部，表明提交的是 JSON 数据
+            std::list<std::string> header;
+            header.push_back("Content-Type: application/json");
+            header.push_back("Authorization: a1a8668cc1db975a10fb0585e43073e5");
+            //header.push_back("model: Azure_GPT4");
+            request.setOpt<curlpp::options::HttpHeader>(header);
+
+            std::u8string u8Data = u8"{\"messages\": [{\"role\": \"user\",\"content\": \"";
+            u8Data += u8"给这个函数生成 Doxygen 风格的中文代码注释。" + std::u8string(funcDecl.begin(), funcDecl.end());
+            u8Data += u8"\"}]}";
+
+            std::string jsonData(u8Data.begin(), u8Data.end());
+
+            // 设置 POST 数据
+            request.setOpt<curlpp::options::PostFields>(jsonData);
+            request.setOpt<curlpp::options::PostFieldSize>(jsonData.length());
+
+            // 执行请求并捕获响应
+            std::ostringstream response;
+            request.setOpt<curlpp::options::WriteStream>(&response);
+
+            request.perform();
+
+            auto json = nlohmann::json::parse(response.str());
+            std::string result;
+
+            // 检查choices是否存在并且是一个数组
+            if (json.contains("choices") && json["choices"].is_array()) {
+                // 遍历choices数组
+                for (const auto& choice : json["choices"]) {
+                    // 检查message是否存在并且包含content字段
+                    if (choice.contains("message") && choice["message"].is_object()) {
+                        auto message = choice["message"];
+                        if (message.contains("content") && message["content"].is_string()) {
+                            result += message["content"];
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
+        catch (curlpp::RuntimeError& e) {
+            std::cerr << e.what() << std::endl;
+        }
+        catch (curlpp::LogicError& e) {
+            std::cerr << e.what() << std::endl;
+        }
+
+        return std::string();
     }
 }

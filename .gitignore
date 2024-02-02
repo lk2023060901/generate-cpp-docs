@@ -36,3 +36,6 @@ x64
 *.db
 *.ipch
 *.vsidx
+
+# Generate Files
+output
